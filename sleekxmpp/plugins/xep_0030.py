@@ -105,9 +105,9 @@ class xep_0030(base.base_plugin):
 		return self.xmpp.send(iq, self.xmpp.makeIq(iq.get('id')))
 
 	def parseInfo(self, xml):
-		result = {'identity': {}, 'feature': []}
-		for identity in xml.findall('{http://jabber.org/protocol/disco#info}query/{{http://jabber.org/protocol/disco#info}identity'):
-			result['identity'][identity['name']] = identity.attrib
-		for feature in xml.findall('{http://jabber.org/protocol/disco#info}query/{{http://jabber.org/protocol/disco#info}feature'):
+		result = {'identity': [], 'feature': []}
+		for identity in xml.findall('{http://jabber.org/protocol/disco#info}query/{http://jabber.org/protocol/disco#info}identity'):
+			result['identity'].append(identity.attrib)
+		for feature in xml.findall('{http://jabber.org/protocol/disco#info}query/{http://jabber.org/protocol/disco#info}feature'):
 			result['feature'].append(feature.get('var', '__unknown__'))
 		return result
