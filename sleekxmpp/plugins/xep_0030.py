@@ -111,3 +111,12 @@ class xep_0030(base.base_plugin):
 		for feature in xml.findall('{http://jabber.org/protocol/disco#info}query/{http://jabber.org/protocol/disco#info}feature'):
 			result['feature'].append(feature.get('var', '__unknown__'))
 		return result
+
+	def parseItems(self, xml):
+		items = []
+		xmlq = xml.find("{http://jabber.org/protocol/disco#items}query")
+		xmlnodes = xmlq.getchildren()
+		for xmlnode in xmlnodes:
+			items.append(xmlnode.attrib)
+		return items
+
