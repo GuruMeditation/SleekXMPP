@@ -2,7 +2,13 @@ from __future__ import with_statement
 from . import base
 import logging
 #from xml.etree import cElementTree as ET
-from .. xmlstream.stanzabase import ElementBase, ET
+from .. xmlstream.stanzabase import registerStanzaPlugin, ElementBase, ET
+from . import stanza_pubsub
+from . xep_0004 import Form
+
+
+log = logging.getLogger(__name__)
+
 
 class xep_0060(base.base_plugin):
 	"""
@@ -12,13 +18,15 @@ class xep_0060(base.base_plugin):
 	def plugin_init(self):
 		self.xep = '0060'
 		self.description = 'Publish-Subscribe'
-	
-	def create_node(self, jid, node, config=None, collection=False):
+
+	def create_node(self, jid, node, config=None, collection=False, ntype=None):
 		pubsub = ET.Element('{http://jabber.org/protocol/pubsub}pubsub')
 		create = ET.Element('create')
 		create.set('node', node)
 		pubsub.append(create)
 		configure = ET.Element('configure')
+		if collection:
+			ntype = 'collection'
 		#if config is None:
 		#	submitform = self.xmpp.plugin['xep_0004'].makeForm('submit')
 		#else:
@@ -28,26 +36,27 @@ class xep_0060(base.base_plugin):
 				submitform.field['FORM_TYPE'].setValue('http://jabber.org/protocol/pubsub#node_config')
 			else:
 				submitform.addField('FORM_TYPE', 'hidden', value='http://jabber.org/protocol/pubsub#node_config')
-			if collection:
+			if ntype:
 				if 'pubsub#node_type' in submitform.field:
-					submitform.field['pubsub#node_type'].setValue('collection')
+					submitform.field['pubsub#node_type'].setValue(ntype)
 				else:
-					submitform.addField('pubsub#node_type', value='collection')
+					submitform.addField('pubsub#node_type', value=ntype)
 			else:
 				if 'pubsub#node_type' in submitform.field:
 					submitform.field['pubsub#node_type'].setValue('leaf')
 				else:
 					submitform.addField('pubsub#node_type', value='leaf')
-			configure.append(submitform.getXML('submit'))
+			submitform['type'] = 'submit'
+			configure.append(submitform.xml)
 		pubsub.append(configure)
 		iq = self.xmpp.makeIqSet(pubsub)
 		iq.attrib['to'] = jid
 		iq.attrib['from'] = self.xmpp.fulljid
 		id = iq['id']
-		result = self.xmpp.send(iq, "<iq id='%s'/>" % id)
+		result = iq.send()
 		if result is False or result is None or result['type'] == 'error': return False
 		return True
-	
+
 	def subscribe(self, jid, node, bare=True, subscribee=None):
 		pubsub = ET.Element('{http://jabber.org/protocol/pubsub}pubsub')
 		subscribe = ET.Element('subscribe')
@@ -64,10 +73,10 @@ class xep_0060(base.base_plugin):
 		iq.attrib['to'] = jid
 		iq.attrib['from'] = self.xmpp.fulljid
 		id = iq['id']
-		result = self.xmpp.send(iq, "<iq id='%s'/>" % id)
+		result = iq.send()
 		if result is False or result is None or result['type'] == 'error': return False
 		return True
-	
+
 	def unsubscribe(self, jid, node, bare=True, subscribee=None):
 		pubsub = ET.Element('{http://jabber.org/protocol/pubsub}pubsub')
 		unsubscribe = ET.Element('unsubscribe')
@@ -84,10 +93,10 @@ class xep_0060(base.base_plugin):
 		iq.attrib['to'] = jid
 		iq.attrib['from'] = self.xmpp.fulljid
 		id = iq['id']
-		result = self.xmpp.send(iq, "<iq id='%s'/>" % id)
+		result = iq.send()
 		if result is False or result is None or result['type'] == 'error': return False
 		return True
-	
+
 	def getNodeConfig(self, jid, node=None): # if no node, then grab default
 		pubsub = ET.Element('{http://jabber.org/protocol/pubsub#owner}pubsub')
 		if node is not None:
@@ -103,19 +112,19 @@ class xep_0060(base.base_plugin):
 		iq.attrib['from'] = self.xmpp.fulljid
 		id = iq['id']
 		#self.xmpp.add_handler("<iq id='%s'/>" % id, self.handlerCreateNodeResponse)
-		result = self.xmpp.send(iq, "<iq id='%s'/>" % id)
+		result = iq.send()
 		if result is None or result == False or result['type'] == 'error':
-			logging.warning("got error instead of config")
+			log.warning("got error instead of config")
 			return False
 		if node is not None:
 			form = result.find('{http://jabber.org/protocol/pubsub#owner}pubsub/{http://jabber.org/protocol/pubsub#owner}configure/{jabber:x:data}x')
 		else:
 			form = result.find('{http://jabber.org/protocol/pubsub#owner}pubsub/{http://jabber.org/protocol/pubsub#owner}default/{jabber:x:data}x')
 		if not form or form is None:
-			logging.error("No form found.")
+			log.error("No form found.")
 			return False
-		return self.xmpp.plugin['xep_0004'].buildForm(form)
-	
+		return Form(xml=form)
+
 	def getNodeSubscriptions(self, jid, node):
 		pubsub = ET.Element('{http://jabber.org/protocol/pubsub#owner}pubsub')
 		subscriptions = ET.Element('subscriptions')
@@ -126,9 +135,9 @@ class xep_0060(base.base_plugin):
 		iq.attrib['to'] = jid
 		iq.attrib['from'] = self.xmpp.fulljid
 		id = iq['id']
-		result = self.xmpp.send(iq, "<iq id='%s'/>" % id)
+		result = iq.send()
 		if result is None or result == False or result['type'] == 'error':
-			logging.warning("got error instead of config")
+			log.warning("got error instead of config")
 			return False
 		else:
 			results = result.findall('{http://jabber.org/protocol/pubsub#owner}pubsub/{http://jabber.org/protocol/pubsub#owner}subscriptions/{http://jabber.org/protocol/pubsub#owner}subscription')
@@ -149,9 +158,9 @@ class xep_0060(base.base_plugin):
 		iq.attrib['to'] = jid
 		iq.attrib['from'] = self.xmpp.fulljid
 		id = iq['id']
-		result = self.xmpp.send(iq, "<iq id='%s'/>" % id)
+		result = iq.send()
 		if result is None or result == False or result['type'] == 'error':
-			logging.warning("got error instead of config")
+			log.warning("got error instead of config")
 			return False
 		else:
 			results = result.findall('{http://jabber.org/protocol/pubsub#owner}pubsub/{http://jabber.org/protocol/pubsub#owner}affiliations/{http://jabber.org/protocol/pubsub#owner}affiliation')
@@ -171,14 +180,13 @@ class xep_0060(base.base_plugin):
 		iq.append(pubsub)
 		iq.attrib['to'] = jid
 		iq.attrib['from'] = self.xmpp.fulljid
-		id = iq['id']
-		result = self.xmpp.send(iq, "<iq id='%s'/>" % id)
-		if result is not None and result is not False and result.attrib.get('type', 'error') != 'error':
+		result = iq.send()
+		if result is not None and result is not False and result['type'] != 'error':
 			return True
 		else:
 			return False
-		
-	
+
+
 	def setNodeConfig(self, jid, node, config):
 		pubsub = ET.Element('{http://jabber.org/protocol/pubsub#owner}pubsub')
 		configure = ET.Element('configure')
@@ -190,11 +198,11 @@ class xep_0060(base.base_plugin):
 		iq.attrib['to'] = jid
 		iq.attrib['from'] = self.xmpp.fulljid
 		id = iq['id']
-		result = self.xmpp.send(iq, "<iq id='%s'/>" % id)
-		if result is None or result['type'] == 'error': 
+		result = iq.send()
+		if result is None or result['type'] == 'error':
 			return False
 		return True
-	
+
 	def setItem(self, jid, node, items=[]):
 		pubsub = ET.Element('{http://jabber.org/protocol/pubsub}pubsub')
 		publish = ET.Element('publish')
@@ -211,10 +219,13 @@ class xep_0060(base.base_plugin):
 		iq.attrib['to'] = jid
 		iq.attrib['from'] = self.xmpp.fulljid
 		id = iq['id']
-		result = self.xmpp.send(iq, "<iq id='%s'/>" % id)
+		result = iq.send()
 		if result is None or result is False or result['type'] == 'error': return False
 		return True
-	
+
+	def addItem(self, jid, node, items=[]):
+		return self.setItem(jid, node, items)
+
 	def deleteItem(self, jid, node, item):
 		pubsub = ET.Element('{http://jabber.org/protocol/pubsub}pubsub')
 		retract = ET.Element('retract')
@@ -227,13 +238,10 @@ class xep_0060(base.base_plugin):
 		iq.attrib['to'] = jid
 		iq.attrib['from'] = self.xmpp.fulljid
 		id = iq['id']
-		result = self.xmpp.send(iq, "<iq id='%s'/>" % id)
+		result = iq.send()
 		if result is None or result is False or result['type'] == 'error': return False
 		return True
-	
-	def addItem(self, jid, node, items=[]):
-		return setItem(jid, node, items)
-	
+
 	def getNodes(self, jid):
 		response = self.xmpp.plugin['xep_0030'].getItems(jid)
 		items = response.findall('{http://jabber.org/protocol/disco#items}query/{http://jabber.org/protocol/disco#items}item')
@@ -242,7 +250,7 @@ class xep_0060(base.base_plugin):
 			for item in items:
 				nodes[item.get('node')] = item.get('name')
 		return nodes
-	
+
 	def getItems(self, jid, node):
 		response = self.xmpp.plugin['xep_0030'].getItems(jid, node)
 		items = response.findall('{http://jabber.org/protocol/disco#items}query/{http://jabber.org/protocol/disco#items}item')
@@ -260,7 +268,7 @@ class xep_0060(base.base_plugin):
 		try:
 			config.field['pubsub#collection'].setValue(parent)
 		except KeyError:
-			logging.warning("pubsub#collection doesn't exist in config, trying to add it")
+			log.warning("pubsub#collection doesn't exist in config, trying to add it")
 			config.addField('pubsub#collection', value=parent)
 		if not self.setNodeConfig(jid, child, config):
 			return False
@@ -281,7 +289,7 @@ class xep_0060(base.base_plugin):
 		iq.attrib['to'] = ps_jid
 		iq.attrib['from'] = self.xmpp.fulljid
 		id = iq['id']
-		result = self.xmpp.send(iq, "<iq id='%s'/>" % id)
+		result = iq.send()
 		if result is None or result is False or result['type'] == 'error':
 		    return False
 		return True
@@ -294,7 +302,7 @@ class xep_0060(base.base_plugin):
 		try:
 			config.field['pubsub#collection'].setValue(parent)
 		except KeyError:
-			logging.warning("pubsub#collection doesn't exist in config, trying to add it")
+			log.warning("pubsub#collection doesn't exist in config, trying to add it")
 			config.addField('pubsub#collection', value=parent)
 		if not self.setNodeConfig(jid, child, config):
 			return False
