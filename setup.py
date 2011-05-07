@@ -12,6 +12,8 @@
 from distutils.core import setup
 import sys
 
+import sleekxmpp
+
 # if 'cygwin' in sys.platform.lower():
 #     min_version = '0.6c6'
 # else:
@@ -25,7 +27,7 @@ import sys
 #
 # from setuptools import setup, find_packages, Extension, Feature
 
-VERSION          = '1.0.0.0'
+VERSION          = sleekxmpp.__version__
 DESCRIPTION      = 'SleekXMPP is an elegant Python library for XMPP (aka Jabber, Google Talk, etc).'
 LONG_DESCRIPTION = """
 SleekXMPP is an elegant Python library for XMPP (aka Jabber, Google Talk, etc).
@@ -38,13 +40,24 @@ CLASSIFIERS      = [ 'Intended Audience :: Developers',
                    ]
 
 packages     = [ 'sleekxmpp',
-                 'sleekxmpp/plugins',
                  'sleekxmpp/stanza',
                  'sleekxmpp/test',
                  'sleekxmpp/xmlstream',
                  'sleekxmpp/xmlstream/matcher',
                  'sleekxmpp/xmlstream/handler',
                  'sleekxmpp/thirdparty',
+                 'sleekxmpp/plugins',
+                 'sleekxmpp/plugins/xep_0009',
+                 'sleekxmpp/plugins/xep_0009/stanza',
+                 'sleekxmpp/plugins/xep_0030',
+                 'sleekxmpp/plugins/xep_0030/stanza',
+                 'sleekxmpp/plugins/xep_0050',
+                 'sleekxmpp/plugins/xep_0059',
+                 'sleekxmpp/plugins/xep_0085',
+                 'sleekxmpp/plugins/xep_0086',
+                 'sleekxmpp/plugins/xep_0092',
+                 'sleekxmpp/plugins/xep_0128',
+                 'sleekxmpp/plugins/xep_0199',
                  ]
 
 if sys.version_info < (3, 0):

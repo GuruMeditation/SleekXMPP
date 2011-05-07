@@ -68,13 +68,6 @@ class ClientXMPP(BaseXMPP):
         """
         BaseXMPP.__init__(self, 'jabber:client')
 
-        # To comply with PEP8, method names now use underscores.
-        # Deprecated method names are re-mapped for backwards compatibility.
-        self.updateRoster = self.update_roster
-        self.delRosterItem = self.del_roster_item
-        self.getRoster = self.get_roster
-        self.registerFeature = self.register_feature
-
         self.set_jid(jid)
         self.password = password
         self.escape_quotes = escape_quotes
@@ -139,7 +132,7 @@ class ClientXMPP(BaseXMPP):
             log.debug("Session start has taken more than 15 seconds")
             self.disconnect(reconnect=self.auto_reconnect)
 
-    def connect(self, address=tuple()):
+    def connect(self, address=tuple(), reattempt=True, use_tls=True):
         """
         Connect to the XMPP server.
 
@@ -148,7 +141,11 @@ class ClientXMPP(BaseXMPP):
         will be used.
 
         Arguments:
-            address -- A tuple containing the server's host and port.
+            address   -- A tuple containing the server's host and port.
+            reattempt -- If True, reattempt the connection if an
+                         error occurs. Defaults to True.
+            use_tls   -- Indicates if TLS should be used for the
+                         connection. Defaults to True.
         """
         self.session_started_event.clear()
         if not address or len(address) < 2:
@@ -162,11 +159,13 @@ class ClientXMPP(BaseXMPP):
                 log.debug("Since no address is supplied," + \
                               "attempting SRV lookup.")
                 try:
-                    xmpp_srv = "_xmpp-client._tcp.%s" % self.server
+                    xmpp_srv = "_xmpp-client._tcp.%s" % self.boundjid.host
                     answers = dns.resolver.query(xmpp_srv, dns.rdatatype.SRV)
                 except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer):
                     log.debug("No appropriate SRV record found." + \
                                   " Using JID server name.")
+                except (dns.exception.Timeout,):
+                    log.debug("DNS resolution timed out.")
                 else:
                     # Pick a random server, weighted by priority.
 
@@ -190,7 +189,8 @@ class ClientXMPP(BaseXMPP):
             # If all else fails, use the server from the JID.
             address = (self.boundjid.host, 5222)
 
-        return XMLStream.connect(self, address[0], address[1], use_tls=True)
+        return XMLStream.connect(self, address[0], address[1],
+                                 use_tls=use_tls, reattempt=reattempt)
 
     def register_feature(self, mask, pointer, breaker=False):
         """
@@ -270,7 +270,9 @@ class ClientXMPP(BaseXMPP):
         Arguments:
             xml -- The STARTLS proceed element.
         """
-        if not self.authenticated and self.ssl_support:
+        if not self.use_tls:
+            return False
+        elif not self.authenticated and self.ssl_support:
             tls_ns = 'urn:ietf:params:xml:ns:xmpp-tls'
             self.add_handler("<proceed xmlns='%s' />" % tls_ns,
                              self._handle_tls_start,
@@ -300,7 +302,8 @@ class ClientXMPP(BaseXMPP):
         Arguments:
             xml -- The SASL mechanisms stanza.
         """
-        if '{urn:ietf:params:xml:ns:xmpp-tls}starttls' in self.features:
+        if self.use_tls and \
+           '{urn:ietf:params:xml:ns:xmpp-tls}starttls' in self.features:
             return False
 
         log.debug("Starting SASL Auth")
@@ -384,7 +387,7 @@ class ClientXMPP(BaseXMPP):
         self.set_jid(response.xml.find('{%s}bind/{%s}jid' % (bind_ns,
                                                              bind_ns)).text)
         self.bound = True
-        log.info("Node set to: %s" % self.boundjid.fulljid)
+        log.info("Node set to: %s" % self.boundjid.full)
         session_ns = 'urn:ietf:params:xml:ns:xmpp-session'
         if "{%s}session" % session_ns not in self.features or self.bindfail:
             log.debug("Established Session")
@@ -434,3 +437,11 @@ class ClientXMPP(BaseXMPP):
             iq.reply()
             iq.enable('roster')
             iq.send()
+
+
+# To comply with PEP8, method names now use underscores.
+# Deprecated method names are re-mapped for backwards compatibility.
+ClientXMPP.updateRoster = ClientXMPP.update_roster
+ClientXMPP.delRosterItem = ClientXMPP.del_roster_item
+ClientXMPP.getRoster = ClientXMPP.get_roster
+ClientXMPP.registerFeature = ClientXMPP.register_feature
