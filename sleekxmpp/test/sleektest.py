@@ -16,7 +16,8 @@ import sleekxmpp
 from sleekxmpp import ClientXMPP, ComponentXMPP
 from sleekxmpp.stanza import Message, Iq, Presence
 from sleekxmpp.test import TestSocket, TestLiveSocket
-from sleekxmpp.xmlstream import StanzaBase, ET, register_stanza_plugin
+from sleekxmpp.xmlstream import ET, register_stanza_plugin
+from sleekxmpp.xmlstream import ElementBase, StanzaBase
 from sleekxmpp.xmlstream.tostring import tostring
 from sleekxmpp.xmlstream.matcher import StanzaPath, MatcherId
 from sleekxmpp.xmlstream.matcher import MatchXMLMask, MatchXPath
@@ -201,7 +202,7 @@ class SleekTest(unittest.TestCase):
                     "Stanza:\n%s" % str(stanza))
         else:
             stanza_class = stanza.__class__
-            if isinstance(criteria, str):
+            if not isinstance(criteria, ElementBase):
                 xml = self.parse_xml(criteria)
             else:
                 xml = criteria.xml
@@ -257,6 +258,13 @@ class SleekTest(unittest.TestCase):
 
     # ------------------------------------------------------------------
     # Methods for simulating stanza streams.
+
+    def stream_disconnect(self):
+        """
+        Simulate a stream disconnection.
+        """
+        if self.xmpp:
+            self.xmpp.socket.disconnect_error()
 
     def stream_start(self, mode='client', skip=True, header=None,
                            socket='mock', jid='tester@localhost',
@@ -326,6 +334,8 @@ class SleekTest(unittest.TestCase):
         self.xmpp.process(threaded=True)
         if skip:
             if socket != 'live':
+                # Mark send queue as usable
+                self.xmpp.session_started_event.set()
                 # Clear startup stanzas
                 self.xmpp.socket.next_sent(timeout=1)
                 if mode == 'component':
@@ -606,7 +616,7 @@ class SleekTest(unittest.TestCase):
             self.fail("Stanza data was sent: %s" % sent)
         if sent is None:
             self.fail("No stanza was sent.")
-        
+
         xml = self.parse_xml(sent)
         self.fix_namespaces(xml, 'jabber:client')
         sent = self.xmpp._build_stanza(xml, 'jabber:client')
