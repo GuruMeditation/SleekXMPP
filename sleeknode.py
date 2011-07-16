@@ -2,6 +2,9 @@
 # -*- coding: utf-8 -*-
 
 """
+    SleekXMPP: The Sleek XMPP Library
+    Copyright (C) 2010  Nathanael C. Fritz
+    This file is part of SleekXMPP.
     See the file LICENSE for copying permission.
 """
 
@@ -173,8 +176,8 @@ if __name__ == '__main__':
     # not matter.
     xmpp = Server(config)
     xmpp.registerPlugin('xep_0030') # Service Discovery
-    xmpp.registerPlugin('xep_0004') # Data Forms
-    xmpp.registerPlugin('xep_0060') # PubSub
+#    xmpp.registerPlugin('xep_0004') # Data Forms
+#    xmpp.registerPlugin('xep_0060') # PubSub
     xmpp.registerPlugin('xep_0199') # XMPP Ping
 
     # Connect to the XMPP server and start processing XMPP stanzas.
